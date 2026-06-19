@@ -79,3 +79,43 @@ def to_survey_data(r_data):
         return result_df.to_dict('records')
     except Exception as e:
         raise e
+
+def to_happycall_static_data(r_data):
+    try:
+        data = json.loads(r_data)
+        sday = data.get("sday", '')
+        eday = data.get("eday", '')
+        happy_call_1 = data.get("happy_call_1", [])
+        happy_call_2 = data.get("happy_call_2", [])
+        survey_respondent_1 = data.get("survey_respondent_1", [])
+        survey_respondent_2 = data.get("survey_respondent_2", [])
+
+        date_list = pd.date_range(start=sday, end=eday, freq='D')
+        m_data_list = [{'date_': str(ditem.strftime("%Y%m%d"))} for ditem in date_list]
+
+        pd_m_data_list = pd.DataFrame(m_data_list)
+
+        pd_happy_call_1 = pd.DataFrame(happy_call_1).rename(columns={'cnt_': 'cnt_h1'}) if happy_call_1 else pd.DataFrame(columns=['date_', 'cnt_h1'])
+        pd_happy_call_2 = pd.DataFrame(happy_call_2).rename(columns={'cnt_': 'cnt_h2'}) if happy_call_2 else pd.DataFrame(columns=['date_', 'cnt_h2'])
+        pd_survey_respondent_1 = pd.DataFrame(survey_respondent_1).rename(columns={'cnt_': 'cnt_r1'}) if survey_respondent_1 else pd.DataFrame(columns=['date_', 'cnt_r1'])
+        pd_survey_respondent_2 = pd.DataFrame(survey_respondent_2).rename(columns={'cnt_': 'cnt_r2'}) if survey_respondent_2 else pd.DataFrame(columns=['date_', 'cnt_r2'])
+
+        t_list = pd_m_data_list.merge(pd_happy_call_1, on='date_', how='left')\
+                               .merge(pd_happy_call_2, on='date_', how='left') \
+                               .merge(pd_survey_respondent_1, on='date_', how='left')\
+                               .merge(pd_survey_respondent_2, on='date_', how='left')
+        t_list = t_list.fillna(0)
+
+        # 데이터가 비어있을 경우를 대비해 컬럼 보장 후 int 변환
+        for col in ['cnt_h1', 'cnt_h2', 'cnt_r1', 'cnt_r2']:
+            if col in t_list.columns:
+                t_list[col] = t_list[col].astype('int')
+            else:
+                t_list[col] = 0
+
+        t_list = t_list.sort_values(by=['date_'], ascending=False)
+        sum_list = t_list[['cnt_h1', 'cnt_h2', 'cnt_r1', 'cnt_r2']].sum()
+
+        return t_list.to_dict('records'), sum_list.to_dict()
+    except Exception as e:
+        raise e
